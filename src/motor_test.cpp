@@ -7,15 +7,18 @@
 #define sixIN1 26
 #define sixIN2 25
 #define twelveIN1 12
-#define twelveIN2 36
+#define twelveIN2 32
 #define twelveSTBY 5
 #define sixSTBY 14
 
 // Encoder pins
 #define sixENCA 34
 #define sixENCB 35
-#define twelveENCA 32
+#define twelveENCA 36
 #define twelveENCB 39
+
+// Laser Pointer Transistor Switch
+#define laserswitch 33
 
 
 // Control Parameters
@@ -27,7 +30,7 @@ const float Kd_6V = 0.0f ;
 const float Ki_6V =  0.0f;
 
 // Counts per Rev
-const float COUNTS_PER_REV_12V = 4281.0f;
+const float COUNTS_PER_REV_12V = 4250.0f;
 const float COUNTS_PER_REV_6V = 1809.0f * 4.0f;
 
 const float COUNTS_PER_DEG_12V = COUNTS_PER_REV_12V / 360.0f;
