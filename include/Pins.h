@@ -41,4 +41,4 @@ const float TILT_MAX_DEG = 270.0f;
 //  Backlash constants
 
 const long BACKLASH_12V_COUNTS = -7;
-const long BACKLASH_6V_COUNTS  = 60;
+const long BACKLASH_6V_COUNTS  = 5;

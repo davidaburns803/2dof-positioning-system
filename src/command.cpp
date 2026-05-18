@@ -144,8 +144,8 @@ void setup() {
     initEncoders();
     initLaser();
 
-    initPD(yawPD, 0.35f, 0.002f, 180, 35, 12);
-    initPD(tiltPD, 0.30f, 0.002f, 180, 35, 20);
+    initPD(yawPD, 0.35f, 0.002f, 120, 45, 12);
+    initPD(tiltPD, 0.30f, 0.002f, 120, 45, 20);
 
     laserOn();
 
