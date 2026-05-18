@@ -1,65 +1,111 @@
 #include "Encoder.h"
+#include "Pins.h"
 #include "driver/gpio.h"
 
-// Encoder pins
-#define twelveENCA 36
-#define twelveENCB 39
-
-volatile long positionCounts = 0;
-volatile uint8_t prevAB = 0;
-
-portMUX_TYPE encMux = portMUX_INITIALIZER_UNLOCKED;
-
-static const int8_t TRANSITION[16] = {
-   0, +1, -1,  0,
-  -1,  0,  0, +1,
-  +1,  0,  0, -1,
-   0, -1, +1,  0
+struct EncoderData {   
+    volatile long positionCounts;
+    volatile uint8_t prevAB;
+    portMUX_TYPE mux;
+    uint8_t pinA;
+    uint8_t pinB;
 };
 
-static inline uint8_t readAB_fast() {
-    uint8_t a = gpio_get_level((gpio_num_t)twelveENCA);
-    uint8_t b = gpio_get_level((gpio_num_t)twelveENCB);
+static EncoderData sixEncoder = {
+    0,
+    0,
+    portMUX_INITIALIZER_UNLOCKED,
+    sixENCA,
+    sixENCB
+};
 
+static EncoderData twelveEncoder = {
+    0,
+    0,
+    portMUX_INITIALIZER_UNLOCKED,
+    twelveENCA,
+    twelveENCB
+};
+
+static const int8_t TRANSITION[16] = {
+     0, +1, -1,  0,
+    -1,  0,  0, +1,
+    +1,  0,  0, -1,
+     0, -1, +1,  0
+};
+
+static inline uint8_t readAB_fast(uint8_t pinA, uint8_t pinB) {
+    uint8_t a = gpio_get_level((gpio_num_t)pinA);
+    uint8_t b = gpio_get_level((gpio_num_t)pinB);
     return (a << 1) | b;
 }
 
-void IRAM_ATTR onEncoderChange() {
-    uint8_t curr = readAB_fast();
-    uint8_t idx = (prevAB << 2) | curr;
+static inline void updateEncoderISR(EncoderData* enc) {
+    uint8_t curr = readAB_fast(enc->pinA, enc->pinB);
+    uint8_t idx = (enc->prevAB << 2) | curr;
     int8_t delta = TRANSITION[idx];
 
-    prevAB = curr;
+    enc->prevAB = curr;
 
     if (delta != 0) {
-        portENTER_CRITICAL_ISR(&encMux);
-        positionCounts += delta;
-        portEXIT_CRITICAL_ISR(&encMux);
+        portENTER_CRITICAL_ISR(&enc->mux);
+        enc->positionCounts += delta;
+        portEXIT_CRITICAL_ISR(&enc->mux);
     }
 }
 
-long readCountsAtomic() {
+void IRAM_ATTR onSixEncoderChange() {
+    updateEncoderISR(&sixEncoder);
+}
+
+void IRAM_ATTR onTwelveEncoderChange() {
+    updateEncoderISR(&twelveEncoder);
+}
+
+static long readCountsAtomic(EncoderData* enc) {
     long p;
-
-    portENTER_CRITICAL(&encMux);
-    p = positionCounts;
-    portEXIT_CRITICAL(&encMux);
-
+    portENTER_CRITICAL(&enc->mux);
+    p = enc->positionCounts;
+    portEXIT_CRITICAL(&enc->mux);
     return p;
 }
 
-void writeCountsAtomic(long v) {
-    portENTER_CRITICAL(&encMux);
-    positionCounts = v;
-    portEXIT_CRITICAL(&encMux);
+static void writeCountsAtomic(EncoderData* enc, long v) {
+    portENTER_CRITICAL(&enc->mux);
+    enc->positionCounts = v;
+    portEXIT_CRITICAL(&enc->mux);
 }
 
-void initEncoder() {
+long readSixCountsAtomic() {
+    return readCountsAtomic(&sixEncoder);
+}
+
+long readTwelveCountsAtomic() {
+    return readCountsAtomic(&twelveEncoder);
+}
+
+void writeSixCountsAtomic(long v) {
+    writeCountsAtomic(&sixEncoder, v);
+}
+
+void writeTwelveCountsAtomic(long v) {
+    writeCountsAtomic(&twelveEncoder, v);
+}
+
+void initEncoders() {
+    pinMode(sixENCA, INPUT);
+    pinMode(sixENCB, INPUT);
     pinMode(twelveENCA, INPUT);
     pinMode(twelveENCB, INPUT);
 
-    prevAB = (uint8_t)((digitalRead(twelveENCA) << 1) | digitalRead(twelveENCB));
-    writeCountsAtomic(0);
-    attachInterrupt(digitalPinToInterrupt(twelveENCA), onEncoderChange, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(twelveENCB), onEncoderChange, CHANGE);
+    sixEncoder.prevAB = (uint8_t)((digitalRead(sixENCA) << 1) | digitalRead(sixENCB));
+    twelveEncoder.prevAB = (uint8_t)((digitalRead(twelveENCA) << 1) | digitalRead(twelveENCB));
+
+    writeSixCountsAtomic(0);
+    writeTwelveCountsAtomic(0);
+
+    attachInterrupt(digitalPinToInterrupt(sixENCA), onSixEncoderChange, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(sixENCB), onSixEncoderChange, CHANGE);
+
+    attachInterrupt(digitalPinToInterrupt(twelveENCA), onTwelveEncoderChange, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(twelveENCB), onTwelveEncoderChange, CHANGE);
 }
